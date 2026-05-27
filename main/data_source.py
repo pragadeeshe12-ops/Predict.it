@@ -17,10 +17,11 @@ def get_stock_data(stock_name: str, duration: str, period: str) -> pd.DataFrame:
     fetched_data.to_csv(csv_path)
     return fetched_data
 
-def add_technical_indicators() -> pd.DataFrame:
+def add_technical_indicators(stock_name: str) -> pd.DataFrame:
     from constant import INPUT_CSV
     csv_path = os.path.join(BASE_DIR, INPUT_CSV)
     df = pd.read_csv(csv_path)
+    df['stock_name'] = stock_name
     df['Date'] = pd.to_datetime(df['Date'])
     df = df.sort_values('Date').reset_index(drop=True)
 
@@ -64,6 +65,10 @@ def add_technical_indicators() -> pd.DataFrame:
     df["rsi_oversold"] = (df["rsi_14"] < 30).astype(int)
     df["rsi_overbought"] = (df["rsi_14"] > 70).astype(int)
     processed_path = os.path.join(BASE_DIR, "processed_data/processed_data.csv")
-    df.to_csv(processed_path, index=False)
+    file_exists = os.path.isfile(processed_path)
+    df.to_csv(processed_path,
+              mode='a',
+              header=not file_exists,
+              index=False)
     print(f"CSV updated with technical indicators: {csv_path}")
     return df
