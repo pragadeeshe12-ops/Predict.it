@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+.idea/
+*.iml
+historical_data.csv
+out/
