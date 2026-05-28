@@ -5,6 +5,7 @@ import numpy as np
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import joblib
+from huggingface_hub import upload_file
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -23,6 +24,14 @@ def load_data(file_path):
     return df_clean, latest_row
 
 
+def encode_stock_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert stock_name into one-hot numeric columns for XGBoost."""
+    encoded = df.copy()
+    if "stock_name" in encoded.columns:
+        encoded = pd.get_dummies(encoded, columns=["stock_name"], prefix="stock")
+    return encoded
+
+
 # 2. FEATURE + TARGET SPLIT
 def prepare_features(df, target_col="target_range"):
     drop_cols = ["Date", "target", "target_range"]
@@ -31,6 +40,7 @@ def prepare_features(df, target_col="target_range"):
     drop_cols = [col for col in drop_cols if col in df.columns]
 
     X = df.drop(columns=drop_cols)
+    X = encode_stock_features(X)
     y = df[target_col]
 
     return X, y
@@ -67,6 +77,8 @@ def train_model(X_train, y_train, X_test, y_test):
         eval_set=[(X_test, y_test)],
         verbose=True
     )
+    # Keep training feature order for inference-time column alignment.
+    model.feature_columns = list(X_train.columns)
 
     return model
 
@@ -89,81 +101,13 @@ def evaluate_model(model, X_test, y_test):
 # 6. SAVE MODEL
 def save_model(model, path="xgb_model.pkl"):
     joblib.dump(model, path)
-    print(f"Model saved at {path}")
+    upload_file(
+        path_or_fileobj=os.path.join(BASE_DIR, "main/xgb_model.pkl"),
+        path_in_repo="xgb_model.pkl",
+        repo_id="praga-deesh/predict.id",
+        repo_type="model"
+    )
 
-
-# 7. LOAD MODEL
-
-def load_model(path="xgb_model.pkl"):
-    return joblib.load(path)
-
-
-# 8. PREDICT NEXT DAY RANGE
-def predict_next(model, latest):
-    drop_cols = ["Date", "target", "target_range"]
-    drop_cols = [col for col in drop_cols if col in latest.columns]
-
-    latest_X = latest.drop(columns=drop_cols).fillna(0)
-
-    # Prediction
-    predicted_range = model.predict(latest_X)[0]
-    current_price = latest["Close"].values[0]
-
-    # Range
-    lower = current_price - (predicted_range / 2)
-    upper = current_price + (predicted_range / 2)
-
-    # -------------------------------
-    # SIGNALS (from your features)
-    # -------------------------------
-    rsi = latest["rsi_14"].values[0]
-    volume_spike = latest["volume_spike"].values[0]
-    support = latest["rolling_low_10"].values[0]
-    resistance = latest["rolling_high_10"].values[0]
-
-    # RSI condition
-    if rsi < 30:
-        rsi_signal = "Oversold"
-    elif rsi > 70:
-        rsi_signal = "Overbought"
-    else:
-        rsi_signal = "Neutral"
-
-    # Support check
-    near_support = abs(current_price - support) < predicted_range
-
-    # Volume
-    volume_signal = "YES" if volume_spike == 1 else "NO"
-
-    return {
-        "range": predicted_range,
-        "lower": lower,
-        "upper": upper,
-        "rsi": rsi_signal,
-        "volume": volume_signal,
-        "near_support": near_support,
-        "current_price": current_price
-    }
-
-def round_to_tick(price, tick=0.05):
-    return round(price / tick) * tick
-
-def generate_signal(data):
-    score = 0
-
-    if data["rsi"] == "Oversold":
-        score += 1
-    if data["near_support"]:
-        score += 1
-    if data["volume"] == "YES":
-        score += 1
-
-    if score >= 2:
-        return "BUY"
-    elif score == 1:
-        return "WEAK BUY"
-    else:
-        return "NO TRADE"
 
 
 if __name__ == "__main__":
@@ -189,18 +133,3 @@ if __name__ == "__main__":
 
     # Step 6: Save
     save_model(model)
-
-    # Step 7: Predict using the actual latest row (today's data)
-    result = predict_next(model, latest_row)
-    lower = round_to_tick(result['lower'])
-    upper = round_to_tick(result['upper'])
-    signal = generate_signal(result)
-
-    print("\n========== TRADING OUTPUT ==========")
-    print(f"Current Price       : {result['current_price']:.2f}")
-    print(f"Predicted Range     : {result['range']:.2f}")
-    print(f"Expected Range      : {int(result['lower'])} - {int(result['upper'])}")
-    print(f"RSI Signal          : {result['rsi']}")
-    print(f"Volume Spike        : {result['volume']}")
-    print(f"Near Support        : {'YES' if result['near_support'] else 'NO'}")
-    print(f"\n👉 FINAL SIGNAL     : {signal}")
