@@ -105,5 +105,6 @@ def save_model(model, path="xgb_model.pkl"):
         path_or_fileobj=os.path.join(BASE_DIR, "main/xgb_model.pkl"),
         path_in_repo="xgb_model.pkl",
         repo_id="praga-deesh/predict.id",
-        repo_type="model"
+        repo_type="model",
+        token=os.environ.get("HF_TOKEN"),
     )
