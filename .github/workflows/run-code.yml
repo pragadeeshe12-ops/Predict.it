@@ -1,0 +1,24 @@
+name: Run hf Workflow
+on:
+  schedule:
+    - cron: "0 1 * * *"   # runs daily at 2:00 AM UTC
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run training pipeline
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: python main/main.py
