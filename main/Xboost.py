@@ -107,29 +107,3 @@ def save_model(model, path="xgb_model.pkl"):
         repo_id="praga-deesh/predict.id",
         repo_type="model"
     )
-
-
-
-if __name__ == "__main__":
-    file_path = os.path.join(BASE_DIR, "processed_data", "processed_data.csv")
-    print(file_path)
-
-    # Step 1: Load (clean data for training + latest row for prediction)
-    df, latest_row = load_data(file_path)
-    print(df)
-
-    # Step 2: Prepare features
-    X, y = prepare_features(df)
-
-    # Step 3: Split
-    X_train, X_test, y_train, y_test = train_test_split_time(X, y)
-    print(df["target_range"].describe())
-
-    # Step 4: Train
-    model = train_model(X_train, y_train, X_test, y_test)
-
-    # Step 5: Evaluate
-    evaluate_model(model, X_test, y_test)
-
-    # Step 6: Save
-    save_model(model)
