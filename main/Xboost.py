@@ -36,7 +36,6 @@ def encode_stock_features(df: pd.DataFrame) -> pd.DataFrame:
 def prepare_features(df, target_col="target_range"):
     drop_cols = ["Date", "target", "target_range"]
 
-    # keep only available columns
     drop_cols = [col for col in drop_cols if col in df.columns]
 
     X = df.drop(columns=drop_cols)
@@ -77,7 +76,6 @@ def train_model(X_train, y_train, X_test, y_test):
         eval_set=[(X_test, y_test)],
         verbose=True
     )
-    # Keep training feature order for inference-time column alignment.
     model.feature_columns = list(X_train.columns)
 
     return model
@@ -99,11 +97,14 @@ def evaluate_model(model, X_test, y_test):
 
 
 # 6. SAVE MODEL
-def save_model(model, path="xgb_model.pkl"):
-    joblib.dump(model, path)
+def save_model(model, stock):
+    model_dir = os.path.join(BASE_DIR, "model")
+    os.makedirs(model_dir, exist_ok=True)
+    model_path = os.path.join(model_dir, f"{stock}_xgb_model.pkl")
+    joblib.dump(model, model_path)
     upload_file(
-        path_or_fileobj=os.path.join(BASE_DIR, "main/xgb_model.pkl"),
-        path_in_repo="xgb_model.pkl",
+        path_or_fileobj=model_path,
+        path_in_repo=stock+"-xgb_model.pkl",
         repo_id="praga-deesh/predict.id",
         repo_type="model",
         token=os.environ.get("HF_TOKEN"),

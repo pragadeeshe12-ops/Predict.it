@@ -1,4 +1,5 @@
 import os
+import shutil
 
 import yfinance as yf
 import pandas as pd
@@ -11,19 +12,15 @@ def get_stock_data(stock_name: str, duration: str, period: str) -> pd.DataFrame:
     Returns:
         DataFrame of the downloaded OHLCV data.
     """
-    if os.path.exists(os.path.join(BASE_DIR, "processed_data/processed_data.csv")):
-        os.remove(os.path.join(BASE_DIR, "processed_data/processed_data.csv"))
     fetched_data = yf.download(stock_name, period=duration, interval=period)
     fetched_data = fetched_data.droplevel("Ticker", axis=1)
-    csv_path = os.path.join(BASE_DIR, "processed_data/historical_data.csv")
+    csv_path = os.path.join(BASE_DIR, "historical_data/{}_historical_data.csv".format(stock_name))
     fetched_data.to_csv(csv_path)
     return fetched_data
 
 def add_technical_indicators(stock_name: str) -> pd.DataFrame:
-    from constant import INPUT_CSV
-    csv_path = os.path.join(BASE_DIR, INPUT_CSV)
+    csv_path = os.path.join(BASE_DIR, "historical_data/{}_historical_data.csv".format(stock_name))
     df = pd.read_csv(csv_path)
-    df['stock_name'] = stock_name
     df['Date'] = pd.to_datetime(df['Date'])
     df = df.sort_values('Date').reset_index(drop=True)
 
@@ -66,11 +63,22 @@ def add_technical_indicators(stock_name: str) -> pd.DataFrame:
     df["volume_spike"] = (df["Volume"] > 1.5 * df["vol_ma_10"]).astype(int)
     df["rsi_oversold"] = (df["rsi_14"] < 30).astype(int)
     df["rsi_overbought"] = (df["rsi_14"] > 70).astype(int)
-    processed_path = os.path.join(BASE_DIR, "processed_data/processed_data.csv")
-    file_exists = os.path.isfile(processed_path)
-    df.to_csv(processed_path,
-              mode='a',
-              header=not file_exists,
-              index=False)
-    print(f"CSV updated with technical indicators: {csv_path}")
+    processed_path = os.path.join(BASE_DIR, 'processed_data/{}/processed_data.csv'.format(stock_name))
+    os.makedirs(os.path.dirname(processed_path), exist_ok=True)
+    df.to_csv(processed_path, mode="w", index=False)
+    print(f"CSV written with technical indicators: {processed_path}")
     return df
+
+def cleanup_stock_files(stock):
+    """Remove historical data and processed_data for one stock."""
+    paths_to_remove = [
+        os.path.join(BASE_DIR, "processed_data", stock),
+        os.path.join(BASE_DIR, "historical_data", f"{stock}_historical_data.csv"),
+    ]
+    for path in paths_to_remove:
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+            print(f"Deleted folder: {path}")
+        elif os.path.isfile(path):
+            os.remove(path)
+            print(f"Deleted file: {path}")
