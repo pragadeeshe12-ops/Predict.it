@@ -15,6 +15,7 @@ def get_stock_data(stock_name: str, duration: str, period: str) -> pd.DataFrame:
     fetched_data = yf.download(stock_name, period=duration, interval=period)
     fetched_data = fetched_data.droplevel("Ticker", axis=1)
     csv_path = os.path.join(BASE_DIR, "historical_data/{}_historical_data.csv".format(stock_name))
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     fetched_data.to_csv(csv_path)
     return fetched_data
 
